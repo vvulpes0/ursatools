@@ -1,0 +1,310 @@
+.Dd July 22, 2026
+.Dt TEDDY 1
+.Os URSA
+.Sh NAME
+.Nm teddy
+.Nd URSA software simulator and debugger
+.Sh SYNOPSIS
+.Nm
+.Op Fl hqrv?
+.Op Fl d Ar size
+.Op Fl t Ar size
+.Op Ar prefix
+.Sh DESCRIPTION
+The
+.Nm
+utility provides an interactive environment
+for simulating and debugging programs written for the URSA architecture.
+If the
+.Ar prefix
+is specified, then an attempt is made to read each of
+.Dq Ar prefix Ns No .lcode
+for the program code in the text segment,
+.Dq Ar prefix Ns No .ldata
+for the initial data memory in the data segment, and
+.Dq Ar prefix Ns No .map
+for the symbol table.
+If at least one of the the first two is successful,
+then a program is considered to have been loaded;
+missing segments are zero-filled with a warning.
+If
+.Dq Ar prefix Ns No .map
+does not exist or cannot be read,
+no warning is emitted.
+Inside the interactive environment,
+the commands are as follows.
+.Bl -tag
+.It Cm breakpoint delete Ar index
+Permanently deactivate the breakpoint with the given
+.Ar index .
+Breakpoints and watchpoints are tracked together,
+so this also handles watchpoints.
+.It Cm breakpoint list
+Enumerate active breakpoints and watchpoints by index and target location.
+.It Cm breakpoint set Ar location
+Configure the system to stop the program when the specified
+.Ar location
+in instruction memory is reached,
+before executing the instruction there.
+Reports the index of the created breakpoint.
+.It Cm continue
+Run until halt,
+defined as successful execution
+of either a conditional branch with displacement zero
+or a conditional move from
+.Sy pc
+to itself.
+Only a breakpoint or watchpoint will pause execution.
+.It Cm disassemble Op Ar location Op Ar size
+Display a human-readable code listing for a region of instruction memory.
+The
+.Ar location
+determines where to start disassembly
+and defaults to the beginning of the current function, if found,
+else the current location.
+The
+.Ar size
+determines how many instructions to emit
+and defaults to the size of the current function, if found,
+else ten.
+.It Cm dump Ar region Ar location Ar size
+Show memory as a hex dump.
+The
+.Ar region
+may be either
+.Sy text
+for instruction memory or
+.Sy data
+for data memory.
+The
+.Ar location
+is the address from which to begin reading.
+The
+.Ar size
+is the number of bytes to include in the output.
+.It Cm help Op Ar command
+List commands, or, if a
+.Ar command
+is specified, give details about that command.
+.It Cm load Ar prefix
+Read a program from the given
+.Ar prefix
+as if it were specified on the command line.
+.It Cm map
+Display a list of symbols and their locations.
+.It Cm memory read Ar format Ar location
+Display a value in memory per the
+.Ar format .
+.Pp
+.Bl -tag -compact
+.It Sy byte
+Unsigned 8-bit decimal value
+.It Sy hword
+Unsigned 16-bit decimal value
+.It Sy word
+Unsigned 32-bit decimal value
+.It Sy sbyte
+Signed 8-bit decimal value
+.It Sy shword
+Signed 16-bit decimal value
+.It Sy sword
+Signed 32-bit decimal value
+.It Sy xbyte
+8-bit hexadecimal value
+.It Sy xhword
+16-bit hexadecimal value
+.It Sy xword
+32-bit hexadecimal value
+.El
+.Pp
+For 16- and 32-bit values,
+the
+.Ar location
+is masked for appropriate alignment.
+In all cases,
+the actual location used is reported alongside the result.
+.It Cm memory write Ar format Ar location Ar value
+Update a value in data memory per the
+.Ar format .
+.Pp
+.Bl -tag -compact
+.It Sy byte
+8 bits
+.It Sy hword
+16 bits
+.It Sy word
+32 bits
+.El
+.Pp
+For 16- and 32-bit values,
+the
+.Ar location
+is masked for appropriate alignment.
+Values are written in little-endian order.
+.It Cm next
+Execute instructions until the next instruction in memory is reached
+or the program halts.
+If the current instruction is a subroutine call,
+this runs that subroutine.
+Execution will pause early if a breakpoint or watchpoint is triggered.
+.It Cm out
+Execute instructions until the program counter matches the current value of
+.Sy rp .
+In a subroutine,
+this typically means to run until return.
+.It Cm quit
+Exit the simulation.
+.It Cm register read Op Ar name ...
+For each given
+.Ar name ,
+display the contents of the register so named.
+Registers may be specified in their decimal forms
+.Pq Sy r0 Ns No \(en Ns Sy r15 ,
+their hexadecimal forms
+.Pq Sy ra Ns No \(en Ns Sy rf ,
+or their usage-based forms
+.Po
+.Sy rT ,
+.Sy fp ,
+.Sy sp ,
+.Sy rp ,
+.Sy pc ,
+and
+.Sy sr
+.Pc .
+All forms are case-insensitive.
+Also accepted are
+.Sq Sy *
+for
+.Dq all registers
+or
+.Sq Sy \&!
+for
+.Dq all nonzero general-purpose registers .
+.It Cm register write Ar name Ar value
+Overwrite the register of the given
+.Ar name
+with the given
+.Ar value .
+The register may be specified in decimal form
+.Pq Sy r0 Ns No \(en Ns Sy r15 ,
+in hexadecimal form
+.Pq Sy ra Ns No \(en Ns Sy rf ,
+or in usage-based form
+.Po
+.Sy rT ,
+.Sy fp ,
+.Sy sp ,
+.Sy rp ,
+.Sy pc ,
+or
+.Sy sr
+.Pc .
+All forms are case-insensitive.
+.It Cm reset
+Set all registers to zero.
+To redo initialization of data memory,
+.Cm load
+the program again.
+.It Cm step
+Execute a single instruction.
+.It Cm to Ar location
+Run until reaching the given
+.Ar location .
+Execution will pause early if a breakpoint or watchpoint is triggered.
+.It Cm version
+Print the program version.
+.It Cm watchpoint delete Ar index
+Permanently deactivate the watchpoint with the given
+.Ar index .
+Watchpoints and breakpoints are tracked together,
+so this also handles breakpoints.
+.It Cm watchpoint list
+Enumerate active watchpoints and breakpoints by index and target location.
+.It Cm watchpoint set Ar location
+Configure the system to stop the program after the specified
+.Ar location
+in data memory is written to.
+Reports the index of the created watchpoint.
+.El
+.Pp
+Anywhere that a
+.Ar location
+is required,
+its value may be specified in any of the following forms.
+.Bl -bullet
+.It
+.Ar name
+.br
+The symbol by the given
+.Ar name .
+If multiple such symbols exist,
+it must be disambiguated by also naming the object file, like
+.Ar file Ns Sy \&: Ns No Ar name .
+.It
+.Ar number
+.br
+An integer value.
+.It
+.Ar name Sy \&+ No Ar number
+.br
+A symbol with positive displacement.
+The spaces around the operator are necessary.
+.It
+.Ar name Sy \&- No Ar number
+.br
+A symbol with negative displacement.
+The spaces around the operator are necessary.
+.El
+.Pp
+Only the second is possible without a symbol table.
+.Sh OPTIONS
+The following flags may be specified in any order.
+.Bl -tag
+.It Fl d Ar size
+Use data memory of
+.Ar size
+bytes.
+The suffixes
+.Sq Sy K ,
+.Sq Sy M ,
+and
+.Sq Sy G
+multiply by successive powers of 1024,
+to supply sizes in kibibytes, mebibytes, or gibibytes.
+The
+.Ar size
+must be a power of two less than four gibibytes.
+.It Fl h Ns No , Fl \&?
+Print a brief help message and exit.
+.It Fl q
+Quit the simulator and print any nonzero register values
+when the program halts.
+.It Fl r
+If a
+.Ar prefix
+is specified on the command line
+and it references a program that is successfully loaded,
+run that program at startup without awaiting a command.
+.It Fl t Ar size
+Use instruction memory of
+.Ar size
+bytes.
+Suffixes
+.Sq Sy K ,
+.Sq Sy M ,
+and
+.Sq Sy G
+multiply by successive powers of 1024,
+to supply sizes in kibibytes, mebibytes, or gibibytes.
+The
+.Ar size
+must be a power of two less than four gibibytes.
+.It Fl v
+Print the version of the program and exit.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr aster 1 ,
+.Xr starlink 1

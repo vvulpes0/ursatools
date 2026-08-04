@@ -1,0 +1,87 @@
+.Dd July 14, 2026
+.Dt STARLINK 1
+.Os URSA
+.Sh NAME
+.Nm starlink
+.Nd static link editor for the URSA architecture
+.Sh SYNOPSIS
+.Nm
+.Op Fl DdhMmTtv?
+.Op Fl o Ar outprefix
+.Ar
+.Sh DESCRIPTION
+The
+.Nm
+program combines one or more ELF object files
+for the URSA architecture
+into an output format suitable for execution.
+This process consists of laying out the target sections,
+performing symbol resolution,
+and applying relocations.
+If no
+.Ar outprefix
+is supplied,
+then
+.Dq Sy out
+is used as a default.
+.Sh OPTIONS
+The following flags may be specified in any order.
+.Bl -tag
+.It Fl D
+Do not include the
+.Sy \&.data
+segment among the output files.
+This overrides any prior occurrence of the
+.Fl d
+flag.
+.It Fl d
+Include the
+.Sy \&.data
+segment among the output files.
+This is the default.
+This overrides any prior occurrence of the
+.Fl D
+flag.
+.It Fl h , Fl \&?
+Print a brief help message and exit.
+.It Fl M
+Do not emit a symbol map. This is the default.
+.It Fl m
+Emit a symbol map to
+.Dq Ar outprefix Ns Sy .map .
+.It Fl o Ar outprefix
+Use
+.Ar outprefix
+as the base name for output files.
+This prefix will be suffixed according to the output.
+For Logisim Evolution,
+the
+.Sy \&.text
+segement is written to
+.Dq Ar outprefix Ns Sy .lcode ,
+and the
+.Sy \&.data
+segment is written to
+.Dq Ar outprefix Ns Sy .ldata .
+.It Fl T
+Do not include the
+.Sy \&.text
+segment among the output files.
+This overrides any prior occurrence of the
+.Fl t
+flag.
+.It Fl t
+Include the
+.Sy \&.text
+segment among the output files.
+This is the default.
+This overrides any prior occurrence of the
+.Fl T
+flag.
+.It Fl v
+Print the version of the program and exit.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr aster 1

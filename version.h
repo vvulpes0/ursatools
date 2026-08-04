@@ -1,0 +1,3 @@
+#ifndef URSA_VERSION
+#define URSA_VERSION "2026 \316\266\315\264"
+#endif

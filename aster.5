@@ -1,0 +1,1067 @@
+.Dd July 14, 2026
+.Dt ASTER 5
+.Os URSA
+.Sh NAME
+.Nm aster
+.Nd assembly language for the URSA architecture
+.Sh DESCRIPTION
+An assembly language program consists of a series of statements,
+one per line.
+A
+.Sy symbol
+is a name.
+Valid symbols consist of one or more characters that are
+uppercase or lowercase alphabetic symbols (A\(enZ or a\(enz),
+digits (0\(en9),
+or the dot (.), underscore (\(ul), or dollar sign ($),
+where the first character is neither a digit nor a dollar sign.
+A statement comes in one of the following forms:
+.Bl -tag
+.It Ar symbol Sy = Ar value
+A
+.Sy symbol binding
+assigns the given
+.Ar value
+to the named
+.Ar symbol .
+Such a binding is permanent; the value cannot later be changed.
+.It Ar symbol Ns Sy \&:
+A
+.Sy label
+assigns the current location to the given
+.Ar symbol .
+Such a binding is permanent; the value cannot later be changed.
+.It Oo Ar symbol Ns Sy \&: Oc Ar directive
+The optional
+.Ar symbol
+specifies a label (see above).
+A
+.Ar directive
+is a command to the assembler itself;
+see the section
+.Sx DIRECTIVES
+below.
+A label is not accepted for
+.Ic .macro ,
+.Ic .endm ,
+.Ic .if ,
+.Ic .else ,
+or
+.Ic .endif .
+.It Oo Ar symbol Ns Sy \&: Oc Ar instruction
+The optional
+.Ar symbol
+specifies a label (see above).
+An
+.Ar instruction
+is a human-readable name for a unit of machine code.
+The assembler converts the instruction into its corresponding machine code
+and places the result in the output file.
+.El
+.Pp
+A semicolon
+.Pq Sy \&;
+begins a
+.Sy comment ;
+the remainder of the line is human-readable text
+that is not interpreted by the assembler.
+Blank lines are ignored.
+.Pp
+The URSA architecture has sixteen 32-bit general-purpose registers,
+numbered
+.Sy r0
+through
+.Sy r15 .
+Registers
+.Sy r10
+through
+.Sy r15
+have hexadecimal aliases
+.Sy ra
+through
+.Sy rf .
+Certain registers have conventional uses
+and have alternate names to reflect these uses:
+register
+.Sy r11
+is the temporary register known as
+.Sy rT ,
+register
+.Sy r12
+is the frame pointer known as
+.Sy fp ,
+register
+.Sy r13
+is the stack pointer known as
+.Sy sp ,
+register
+.Sy r14
+is the return pointer known as
+.Sy rp ,
+and register
+.Sy r15
+is the program counter known as
+.Sy pc .
+Additionally, there is one special-purpose register:
+the status register known as
+.Sy sr .
+Each of these names is case-insensitive.
+Register names are reserved;
+labels and symbols cannot use these names.
+.Sh VALUE EXPRESSIONS
+A value expression consists of numbers, symbols, and operations
+and is used anywhere a
+.Ar value
+is required.
+Value expressions are internally calculated at 64-bit precision,
+to detect some range errors.
+An
+.Sy absolute expression
+is a value expression that the assembler
+can evaluate as a concrete numerical value
+using the information that it has already processed.
+.Pp
+Numbers can be supplied in decimal (no prefix, digits 0\(en9),
+hexadecimal
+.Po
+.Sy 0x
+prefix, digits 0\(en9 and a\(enf, case-insensitive
+.Pc ,
+or binary
+.Po
+.Sy 0b
+prefix, digits 0 and 1
+.Pc
+format
+and evaluate to their numerical value.
+They may contain spaces for grouping.
+A character or escape sequence in single-quotes, like
+.Sy \&'A' ,
+evaluates to its ASCII value.
+Symbols are specified by name and evaluate to their final address.
+The special symbol
+.Dq Sy \&.
+refers to the current location in the current segment.
+.Pp
+Unary operations apply first:
+negation
+.Pq Sy \- Ns Va value ,
+bitwise complement
+.Pq Sy \(ti Ns Va value ,
+and application of functions.
+The following functions are available.
+.Bl -tag
+.It Sy defined( Ns Ar symbol Ns Sy \&)
+Evaluates to one if the
+.Ar symbol
+has already been defined by a label or symbol binding statement,
+otherwise to zero.
+.It Xo
+.Sy g0( Ns Ar value Ns Sy \&) ,
+.Sy g1( Ns Ar value Ns Sy \&) ,
+.Sy g2( Ns Ar value Ns Sy \&) ,
+.Sy g3( Ns Ar value Ns Sy \&)
+.Xc
+Only for the
+.Sy sset
+instruction
+.Po
+see section
+.Sx INSTRUCTIONS
+below
+.Pc .
+Returns the given
+.Ar value
+unchanged,
+with a flag indicating which group of 8 bits
+should be used in the instruction:
+bits 0\(en7 for
+.Sy g0 ,
+bits 8\(en15 for
+.Sy g1 ,
+bits 16\(en23 for
+.Sy g2 ,
+and bits 24\(en31 for
+.Sy g3 .
+.It Sy isreg( Ns Ar argument Ns Sy \&)
+Returns one if the supplied
+.Ar argument
+is a register, or zero otherwise.
+This can be useful in macros.
+.It Sy len( Ns Ar argument Ns Sy \&)
+Returns the length of the given
+.Ar argument ,
+which must be a quoted string.
+.It Sy regnum( Ns Ar argument Ns Sy \&)
+If the supplied
+.Ar argument
+is a register, returns its canonical number from 0\(en15.
+It is an error to supply an
+.Ar argument
+that is not a register.
+.It Sy value( Ns Ar value Ns Sy \&)
+Returns the given
+.Ar value
+unchanged.
+For use with macro parameters,
+which cannot otherwise be used in expressions.
+.El
+.Pp
+Binary operators are as follows,
+listed in order of decreasing precedence.
+Within a given level, chains of operators act left to right.
+Comparisons cannot be chained.
+They return either one (true) or zero (false).
+.Bl -ohang
+.It 1. Multiplication and Division
+.D1 Ar value Sy \&* Ar value Pq multiplication
+.D1 Ar value Sy \&/ Ar value Po division, rounded toward zero Pc
+.D1 Ar value Sy \&% Ar value Pq remainder
+.It 2. Addition and Subtraction
+.D1 Ar value Sy \&+ Ar value Pq addition
+.D1 Ar value Sy \&\- Ar value Pq subtraction
+.It 3. Shifting
+.D1 Ar value Sy \&<< Ar value Po left shift Pc
+.D1 Ar value Sy \&>> Ar value Po right shift Pc
+.It 4. Multiplication-Like Bitwise Parallel Logic
+.D1 Ar value Sy \&& Ar value Pq AND
+.It 5. Addition-Like Bitwise Parallel Logic
+.D1 Ar value Sy \&\(ba Ar value Po OR, inclusive Pc
+.D1 Ar value Sy \&\(ha Ar value Po XOR, exclusive Pc
+.It 6. Comparisons
+.D1 Ar value Sy < Ar value Po less than Pc
+.D1 Ar value Sy <= Ar value Po less than or equal to Pc
+.D1 Ar value Sy = Ar value Po equal to Pc
+.D1 Ar value Sy <> Ar value Po not equal to Pc
+.D1 Ar value Sy >= Ar value Po greater than or equal to Pc
+.D1 Ar value Sy > Ar value Po greater than Pc
+.El
+.Sh DIRECTIVES
+This section lists assembler directives alphabetically.
+.Bl -tag
+.It Ic .ascii Sy \(dq Ns Ar string Ns Sy \(dq
+Directly emit the specified string at the current location.
+Characters are stored in order
+with the first character having the lowest address,
+and the last character having the highest address.
+This string is not implicitly null-terminated.
+.It Ic .asciz Sy \(dq Ns Ar string Ns Sy \(dq
+Directly emit the specified string at the current location,
+followed by a zero byte.
+Characters are stored in order
+with the first character having the lowest address,
+and the last character having the highest address.
+The following zero byte ensures that the string is null-terminated.
+.It Ic .byte Ar value Oo Sy \&, Ar value Oc Ns ...
+Directly emit the specified
+.Ar values ,
+in order,
+at the current location.
+Each may be a signed byte, ranging from \-128 through +127,
+or an unsigned byte, ranging from 0 through 255.
+.It Ic .data
+Enter the data memory segment.
+Subsequent statements and directives will be directed to data memory,
+until the segment is changed again.
+.It Ic .else
+If the associated
+.Ic .if
+directive's test passed, then
+skip to its
+.Ic .endif
+directive.
+Otherwise, continue processing the following statements as normal.
+It is an error to use
+.Ic .else
+outside of
+.Ic .if
+structure.
+.It Ic .endif
+Finalize the conditional processing started by an
+.Ic .if
+directive.
+It is an error to use
+.Ic .endif
+without a corresponding
+.Ic .if
+directive.
+.It Ic .endm
+Finalize the macro definition started by a
+.Ic .macro
+directive.
+It is an error to use
+.Ic .endm
+without a corresponding
+.Ic .macro
+directive.
+.It Ic .error Op Sy \(dq Ns Ar string Ns Sy \(dq
+Abort processing with an error message.
+If the optional
+.Ar string
+is given, it is used as the message.
+.It Ic .function
+When the next label is reached or when the next symbol is bound,
+whichever comes first,
+mark the associated content as a function
+in the output file.
+This is mainly useful for external tools.
+.It Ic .global Ar symbol
+Mark the given
+.Ar symbol
+as a global symbol in the output file if it is defined.
+This allows other object files to see its value
+when linked with this output file,
+as by the
+.Xr starlink 1
+static link editor.
+.It Ic .hword Ar value Oo Sy \&, Ar value Oc Ns ...
+Directly emit the specified
+.Ar values ,
+in order,
+at the current location in little-endian order.
+Each may be a signed 16-bit halfword,
+ranging from \-32,768 through +32,767,
+or an unsigned 16-bit halfword, ranging from 0 through 65,535.
+.It Ic .if Ar value
+An absolute expression is required for the
+.Ar value .
+Test whether it is nonzero.
+If it is nonzero,
+then continue processing the following statements as normal.
+Otherwise,
+skip to the associated
+.Ic .else
+directive if there is one,
+or to the associated
+.Ic .endif
+directive if not.
+It is an error to use
+.Ic .if
+without a corresponding
+.Ic .endif
+directive.
+.It Ic .include Sy \(dq Ns Ar file Ns Sy \(dq
+Read the specified
+.Ar file
+and process its contents in place of this directive.
+If the
+.Ar file
+does not exist in the directory where
+.Xr aster 1
+was run,
+the directories specified in the search path by any
+.Fl I
+options are searched in turn until a file with the given name is found.
+If it cannot be found in any of the searched directories,
+then processing terminates with an error message.
+.It Ic .macro Ar symbol
+Define a new pseudoinstruction with the given
+.Ar symbol
+as its name.
+The definition consists of all following statements
+until the corresponding
+.Ic .endm
+directive, which must appear later in the program.
+The new instruction can take as many parameters as desired;
+they are accessible as
+.Sy #1 ,
+.Sy #2 ,
+and so on within the body of the definition.
+They can appear as an argument in any argument list;
+to use them in expressions, use the
+.Sy value
+function.
+.It Ic .object
+When the next label is reached or when the next symbol is bound,
+whichever comes first,
+mark the associated content as a data object
+in the output file.
+This is mainly useful for external tools.
+.It Ic .p2align Ar alignment
+Emit bytes with value zero
+until at a location in the current segment
+whose address has trailing zero bits
+numbering at least the specified
+.Ar alignment .
+In other words,
+ensure that the next statement has a multiple of
+.No 2** Ns Ar alignment
+as its location.
+Valid values for
+.Ar alignment
+are 0 through 12, inclusive.
+The
+.Ar alignment
+must be an absolute expression.
+.It Ic .size Ar symbol Ns Sy \&, Ar value
+Set the size of the given
+.Ar symbol
+to the given
+.Ar value
+in the output file.
+The
+.Ar symbol
+must have already been defined,
+either by a label or by a symbol binding,
+and the given
+.Ar value
+must be an absolute expression.
+This is mainly useful for external tools.
+.It Ic .text
+Enter the instruction memory segment.
+Until the segment is changed again,
+subsequent statements and directives are directed to instruction memory.
+.It Ic .warning Op Sy \(dq Ns Ar string Ns Sy \(dq
+Report a warning, but continue processing.
+If the optional
+.Ar string
+is supplied, it is used as the warning message.
+.It Ic .word Ar value Oo Sy \&, Ar value Oc Ns ...
+Directly emit the specified
+.Ar values ,
+in order,
+at the current location in little-endian order.
+Each may be a signed 32-bit word, with value
+ranging from \-2,147,483,648 through +2,147,483,647,
+or an unsigned word, from 0 through 4,294,967,296.
+.El
+.Sh INSTRUCTIONS
+This section describes the instruction set of the URSA architecture
+in terms of its assembly language.
+.Ss CONDITIONS
+Some instructions, namely
+.Ic mov Ns Ar cond
+and
+.Ic b Ns Ar cond ,
+are conditionally executed based on the state of the flags
+in the status register.
+The four flags are carry
+.Pq Sy C ,
+overflow
+.Pq Sy V ,
+negative
+.Pq Sy N ,
+and zero
+.Pq Sy Z .
+Generally,
+.Sy C
+means that the result is incorrect
+under an unsigned interpretation,
+.Sy V
+means that the result is incorrect
+under a signed interpretation,
+.Sy N
+means that the sign bit of the result is set, and
+.Sy Z
+means that all bits of the result are clear.
+.Pp
+A common application is to inspect the state of the flags
+after executing an instruction like
+.Dq Ic sub Ar register Ns Sy \&, Ar operand ,
+so many condition codes are named for how the
+.Ar register
+compares to the
+.Ar operand
+in such a context.
+In the conditional instructions
+.Ic b Ns Ar cond
+and
+.Ic mov Ns Ar cond ,
+the
+.Ar cond
+field may be omitted,
+in which case the instruction executes unconditionally,
+or it may be
+.Sy f ,
+in which case the instruction never executes,
+or it may be any of the following.
+.Pp
+.Bl -tag -compact
+.It Sy cc : No Carry is clear Bo synonym Sy hs Bc
+.No ! Ns Sy C
+.It Sy cs : No Carry is set Bo synonym Sy lo Bc
+.Sy C
+.It Sy eq : No Equal Bo synonym Sy z Bc
+.Sy Z
+.It Sy ge : No Signed greater than or equal to
+.No \&! Ns Po Sy N No xor Sy V Pc
+.It Sy gt : No Signed greater than
+.No \&! Ns Po Po Sy N No xor Sy V Pc or Sy Z Pc
+.It Sy hi : No Unsigned greater than Pq Dq higher
+.No \&! Ns Sy C
+and
+.No \&! Ns Sy Z
+.It Xo
+.Sy hs : No Unsigned greater than or equal to Pq Do higher or same Dc
+.Bq synonym Sy cc
+.Xc
+.No \&! Ns Sy C
+.It Sy le : No Signed less than or equal to
+.Pq Sy N No xor Sy V
+or
+.Sy Z
+.It Xo
+.Sy lo : No Unsigned less than
+.Pq Dq lower
+.Bq synonym Sy cs
+.Xc
+.Sy C
+.It Sy ls : No Unsigned less than or equal to Pq Dq lower or same
+.Sy C
+or
+.Sy Z
+.It Sy lt : No Signed less than
+.Sy N
+xor
+.Sy V
+.It Sy mi : No Negative Pq Dq minus
+.Sy N
+.It Sy ne : No Not equal Bq synonym Sy nz
+.No \&! Ns Sy Z
+.It Sy nz : No Nonzero Bq synonym Sy ne
+.No \&! Ns Sy Z
+.It Sy pl : No Nonnegative Pq Dq plus
+.No \&! Ns Sy N
+.It Sy vc : No Overflow is clear
+.No \&! Ns Sy V
+.It Sy vs : No Overflow is set
+.Sy V
+.It Sy z : No Zero Bq synonym Sy eq
+.Sy Z
+.El
+.Ss INSTRUCTION OVERVIEW
+Instructions can be divided into the following groups.
+Aside from the special case of
+.Dq Ic mov Sy sr, Ar register ,
+which directly manipulates the status register,
+only the first group affects condition flags.
+.Bl -ohang
+.It Sy Flag-Affecting Arithmetic and Logic
+.Bl -column -compact column column column column
+.It adds Ta clrs Ta lsrs Ta subs
+.It adxs Ta iors Ta rlcs Ta sbxs
+.It ands Ta lsls Ta rrcs Ta xors
+.It asrs
+.El
+.It Sy Flag-Preserving Arithmetic and Logic
+.Bl -column -compact column column column column
+.It add Ta asr Ta lsl Ta sbx
+.It adx Ta clr Ta lsr Ta xor
+.It and Ta ior Ta sub
+.El
+.It Sy Memory Interaction
+.Bl -column -compact column column column column
+.It ld Ta ldb Ta sto Ta stob
+.El
+.It Sy Non-Memory Value Assignment
+.Bl -column -compact columncolumn columncolumn
+.It mov Ns Ar cond Ta sset
+.El
+.It Sy Control Flow
+.Bl -column -compact columncolumncolumncolumn
+.It b Ns Ar cond
+.El
+.El
+.Ss INSTRUCTION REFERENCE
+This section contains an alphabetical listing of URSA instructions.
+Each instruction begins with a synopsis of its syntax,
+which is followed by the full name of the instruction,
+a description of its effects,
+and finally a brief description of how it affects
+the flags in the status register.
+The carry (C), overflow (V), negative (N), and zero (Z)
+flags are given in the order CVNZ,
+and the effect is given by a single character:
+.Bl -tag
+.It Sy 0
+The flag is always cleared.
+.It Sy \&\-
+The flag is unchanged.
+.It Sy C , V , N , Z
+The flag is set according to the operation result.
+.El
+.Pp
+In the following descriptions,
+a
+.Dq Sy shifted nibble
+is a value that can be written as a hexadecimal number
+using only one nonzero character after the
+.Sy 0x
+prefix,
+such as
+.Sy 0x0f000000
+or
+.Sy 0x00000400 ,
+but not, say,
+.Sy 0x0f000400 ,
+as that contains two nonzero characters.
+When
+.Dq register
+is used unqualified,
+it refers to one of the sixteen general-purpose registers.
+.Bl -ohang
+.It Ic add Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq ADD
+.Ed
+Add the given
+.Ar value
+to the contents of the given
+.Ar register
+and store the result back into the given
+.Ar register .
+The
+.Ar value
+must be a register or a shifted nibble.
+.Bd -filled -compact
+.Ic add
+\- \- \- \-
+/
+.Ic adds
+C V N Z
+.Ed
+.It Ic adx Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq ADD EXTENDED
+.Ed
+Add the given
+.Ar value
+and the contents of the carry flag
+to the contents of the given
+.Ar register
+and store the result back into the given
+.Ar register .
+The
+.Ar value
+must be a register or a shifted nibble.
+.Bd -filled -compact
+.Ic adx
+\- \- \- \-
+/
+.Ic adxs
+C V N Z
+.Ed
+.It Ic and Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq BITWISE PARALLEL LOGICAL AND
+.Ed
+For each bit position,
+compute the logical AND
+of the associated bit in the given
+.Ar value
+with the associated bit in the given
+.Ar register
+and store the result back into the given
+.Ar register .
+This clears any bits that are cleared in the
+.Ar value .
+The
+.Ar value
+must be a register
+or a shifted nibble.
+.Bd -filled -compact
+.Ic and
+\- \- \- \-
+/
+.Ic ands
+0 0 N Z
+.Ed
+.It Ic asr Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq ARITHMETIC SHIFT RIGHT
+.Ed
+Shift the contents of the given
+.Ar register
+to the right as many times as indicated by the given
+.Ar value ,
+which must be a register or a number between 0 and 31, inclusive.
+The
+.Ar register
+is treated as a signed value:
+if the sign bit was originally set,
+then it is set after the operation completes as well.
+This is equivalent to dividing by two
+that number of times, rounding toward minus infinity.
+The carry flag of the result is set if any set bit is shifted out.
+.Bd -filled -compact
+.Ic asr
+\- \- \- \-
+/
+.Ic asrs
+C 0 N Z
+.Ed
+.It Ic b Ns Ar cond Ar symbol
+.Bd -filled -compact
+.Dq Po CONDITIONAL Pc BRANCH
+.Ed
+If the given condition
+.Ar cond
+is satisfied,
+transfer program execution to the named
+.Ar symbol ,
+which must evaluate to a location within instruction memory.
+That is, it must be defined by a label
+in the
+.Sy .text
+segment of this file or that of another file
+that will be linked with the resulting object.
+.Bd -filled -compact
+\- \- \- \-
+.Ed
+.It Ic clr Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq CLEAR BITS
+.Ed
+For each bit set in the given
+.Ar value ,
+clear the bit in the corresponding position of the given
+.Ar register .
+This computes the bitwise parallel logical AND
+of the given
+.Ar register
+and the complement of the given
+.Ar value .
+This
+.Ar value
+must be either a register or a shifted nibble.
+.Bd -filled -compact
+.Ic clr
+\- \- \- \-
+/
+.Ic clrs
+0 0 N Z
+.Ed
+.It Ic ior Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq BITWISE PARALLEL LOGICAL OR
+.Ed
+For each bit position,
+compute the logical inclusive-OR
+of the associated bit in the given
+.Ar value
+with the associated bit in the given
+.Ar register
+and store the result back into the given
+.Ar register .
+This sets any bits that are set in the
+.Ar value .
+The
+.Ar value
+must be a register
+or a shifted nibble.
+.Bd -filled -compact
+.Ic ior
+\- \- \- \-
+/
+.Ic iors
+0 0 N Z
+.Ed
+.It Xo
+.Ic ld
+.Ar register Ns Sy \&,
+.Sy \&[ Ns
+.Ar register Ns Op Sy \&, Ar value Ns
+.Sy \&]
+.Xc
+.Bd -filled -compact
+.Dq LOAD WORD
+.Ed
+Fetch the 32-bit word from the memory address specified by
+adding the given
+.Ar value
+to the contents of the second
+.Ar register ,
+and place the result into the first
+.Ar register .
+The offset
+.Ar value
+must be a multiple of four between 0 and 28, inclusive.
+If not supplied, zero is used.
+The final computed address must also be a multiple of four.
+.Bd -filled -compact
+\- \- \- \-
+.Ed
+.It Xo
+.Ic ldb
+.Ar register Ns Sy \&,
+.Sy \&[ Ns
+.Ar register Ns Op Sy \&, Ar value Ns
+.Sy \&]
+.Xc
+.Bd -filled -compact
+.Dq LOAD BYTE
+.Ed
+Fetch the signed 8-bit byte from the memory address specified by
+adding the given
+.Ar value
+to the contents of the second
+.Ar register ,
+and place the result into the first
+.Ar register .
+The result is sign-extended to fill the entire 32-bit destination
+.Ar register .
+The offset
+.Ar value
+must be between 0 and 7, inclusive.
+If not supplied, zero is used.
+.Bd -filled -compact
+\- \- \- \-
+.Ed
+.It Ic lsl Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq LOGICAL SHIFT LEFT
+.Ed
+Shift the contents of the given
+.Ar register
+to the left as many times as indicated by the given
+.Ar value ,
+which must be a register or a number between 0 and 31, inclusive.
+The low bits shifted in are filled with zero.
+The
+.Ar register
+is treated as an unsigned value.
+This is equivalent to multiplying by two
+that number of times.
+The carry flag of the result is set if any set bit is shifted out.
+.Bd -filled -compact
+.Ic lsl
+\- \- \- \-
+/
+.Ic lsls
+C 0 N Z
+.Ed
+.It Ic lsr Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq LOGICAL SHIFT RIGHT
+.Ed
+Shift the contents of the given
+.Ar register
+to the right as many times as indicated by the given
+.Ar value ,
+which must be a register or a number between 0 and 31, inclusive.
+The high bits shifted in are filled with zero.
+The
+.Ar register
+is treated as an unsigned value:
+if the shift amount is nonzero,
+then the sign bit is unset in the result.
+This is equivalent to dividing by two
+that number of times, rounding down.
+The carry flag of the result is set if any set bit is shifted out.
+.Bd -filled -compact
+.Ic lsr
+\- \- \- \-
+/
+.Ic lsrs
+C 0 N Z
+.Ed
+.It Ic mov Ns Ar cond Ar register Ns Sy \&, Ar register
+.Bd -filled -compact
+.Dq MOVE
+.Ed
+Copy the value from the second, source
+.Ar register
+into the first, destination
+.Ar register ,
+if the given condition
+.Ar cond
+is satisfied.
+Otherwise, do nothing.
+Either the source or the destination (but not both)
+may be the status register
+.Sy sr ;
+in this case, the condition
+.Ar cond
+must be omitted and the instruction executes unconditionally.
+.Bd -filled -compact
+\- \- \- \-
+.Ed
+.It Ic rlcs Ar register
+.Bd -filled -compact
+.Dq ROTATE LEFT THROUGH CARRY
+.Ed
+Shift the bits of the given
+.Ar register
+one position upward.
+The most-significant bit that is shifted out
+is placed into the carry flag,
+and the original carry flag
+is shifted into the newly open least-significant position.
+.Bd -filled -compact
+C 0 N Z
+.Ed
+.It Ic rrcs Ar register
+.Bd -filled -compact
+.Dq ROTATE RIGHT THROUGH CARRY
+.Ed
+Shift the bits of the given
+.Ar register
+one position downward.
+The least-significant bit that is shifted out
+is placed into the carry flag,
+and the original carry flag
+is shifted into the newly open most-significant position.
+.Bd -filled -compact
+C 0 N Z
+.Ed
+.It Ic sbx Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq SUBTRACT EXTENDED
+.Ed
+Subtract the given
+.Ar value
+and the contents of the carry
+.Pq Dq borrow
+flag
+from the contents of the given
+.Ar register
+and store the result back into the given
+.Ar register .
+The
+.Ar value
+must be a register or a shifted nibble.
+.Bd -filled -compact
+.Ic sbx
+\- \- \- \-
+/
+.Ic sbxs
+C V N Z
+.Ed
+.It Ic sset Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq SHIFT AND SET
+.Ed
+Shift bits 0\-23 of the given
+.Ar register
+up to positions 8\-31
+and fill the newly open least-significant byte
+with the given
+.Ar value .
+This
+.Ar value
+must be a number from 0 through 255, inclusive.
+To specify larger numbers, or negative signed values, use the
+.Sy g0 ,
+.Sy g1 ,
+.Sy g2 ,
+and
+.Sy g3
+functions, which extract specific bit ranges to fit this criterion.
+.Bd -filled -compact
+\- \- \- \-
+.Ed
+.It Ic sto \&[ Ns Ar register Ns Oo Sy \&, Ar value Oc Ns Sy \&], Ar register
+.Bd -filled -compact
+.Dq STORE WORD
+.Ed
+Store the 32-bit contents of the second
+.Ar register
+into the memory address specified by
+adding the given
+.Ar value
+to the contents of the first
+.Ar register .
+The offset
+.Ar value
+must be a multiple of four between 0 and 28, inclusive.
+If not supplied, zero is used.
+The final computed address must also be a multiple of four.
+.Bd -filled -compact
+\- \- \- \-
+.Ed
+.It Ic stob \&[ Ns Ar register Ns Oo Sy \&, Ar value Oc Ns Sy \&], Ar register
+.Bd -filled -compact
+.Dq STORE BYTE
+.Ed
+Store the least-significant 8-bit byte of the second
+.Ar register
+into the memory address specified by
+adding the given
+.Ar value
+to the contents of the first
+.Ar register .
+The offset
+.Ar value
+must be between 0 and 7, inclusive.
+No other bytes in memory are affected.
+.Bd -filled -compact
+\- \- \- \-
+.Ed
+.It Ic sub Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq SUBTRACT
+.Ed
+Subtract the given
+.Ar value
+from the contents of the given
+.Ar register
+and store the result back into the given
+.Ar register .
+The
+.Ar value
+must be a register or a shifted nibble.
+.Bd -filled -compact
+.Ic sub
+\- \- \- \-
+/
+.Ic subs
+C V N Z
+.Ed
+.It Ic xor Ns Oo Sy s Oc Ar register Ns Sy \&, Ar value
+.Bd -filled -compact
+.Dq BITWISE PARALLEL LOGICAL XOR
+.Ed
+For each bit position,
+compute the logical exclusive-OR
+of the associated bit in the given
+.Ar value
+with the associated bit in the given
+.Ar register
+and store the result back into the given
+.Ar register .
+This toggles any bits that are set in the
+.Ar value .
+The
+.Ar value
+must be a register
+or a shifted nibble.
+.Bd -filled -compact
+.Ic xor
+\- \- \- \-
+/
+.Ic xors
+0 0 N Z
+.Ed
+.El
+.Sh EXAMPLES
+Compute into register
+.Sy r0
+the sum of the natural numbers from 1 through 256, inclusive
+.Pq resulting in 0x8080 .
+.Bd -literal -offset indent
+\&.text
+\&.p2align 1 ; instructions must start on a halfword boundary
+\&.global main
+\&.function
+main:
+    xor r0, r0
+    sset r1, g3(input)
+    sset r1, g2(input)
+    sset r1, g1(input)
+    sset r1, g0(input)
+    ld r1, [r1]
+main.loop:
+    add r0, r1
+    subs r1, 1
+    bnz main.loop
+\&.size main, . - main
+    b . ; halt the processor after main is finished
+\&.data
+\&.p2align 2
+\&.object
+input: .word 0x100
+\&.size input, . - input
+.Ed
+.Sh SEE ALSO
+.Xr aster 1 ,
+.Xr starlink 1

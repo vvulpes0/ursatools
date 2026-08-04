@@ -1,0 +1,74 @@
+.Dd July 14, 2026
+.Dt ASTER 1
+.Os URSA
+.Sh NAME
+.Nm aster
+.Nd assembler for the URSA architecture
+.Sh SYNOPSIS
+.Nm
+.Op Fl s Ns | Ns Fl g
+.Op Fl hv?
+.Op Fl I Ar path
+.Op Fl o Ar outfile
+.Op Ar file
+.Sh DESCRIPTION
+The
+.Nm
+command creates a relocatable ELF object file
+from an assembly language source
+.Ar file .
+If no
+.Ar file
+is specified,
+or if
+.Dq Sy \-
+is specified as the
+.Ar file
+argument,
+then the standard input is used.
+As is tradition,
+if no output file is named,
+then output is written to a file named
+.Dq Sy a.out .
+Despite the name, this file is not in the a.out format of 4.3BSD.
+.Sh OPTIONS
+The following flags may be specified in any order.
+.Bl -tag
+.It Fl g
+Print a representation of the program in GraphViz format
+suitable for processing by
+.Xr dot 1 .
+It is an error to specify both this option and the
+.Fl s
+option.
+.It Fl h , Fl \&?
+Print a brief help message and exit.
+.It Fl I Ar path
+Add
+.Ar path
+to the list of directories to be searched for files included by
+.Ic .include
+directives.
+If multiple
+.Fl I
+options are specified,
+the named directories are searched in the order they were added.
+.It Fl o Ar outfile
+Write the resulting object to
+.Ar outfile
+instead of to
+.Dq Sy a.out .
+.It Fl s
+Print a representation of the internal state upon exit.
+It is an error to specify both this option and the
+.Fl g
+option.
+.It Fl v
+Print the version of the program and exit.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr dot 1 ,
+.Xr starlink 1 ,
+.Xr aster 5

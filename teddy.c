@@ -62,6 +62,7 @@ struct machine {
 	unsigned long textsize;
 	unsigned long datasize;
 	unsigned long registers[17]; /* r0 - rF, then sr */
+	unsigned long oldpc;
 	_Bool isloaded;
 };
 
@@ -266,6 +267,7 @@ main(int argc, char *argv[])
 		textsize, datasize,
 		{0},
 		0,
+		0,
 	};
 	if (argc) {
 		load(&m, *argv);
@@ -427,6 +429,7 @@ repl(struct machine *m, struct dynarr *breaks, int flags, char **oldws)
 			        error());
 		}
 	} else if (!strcmp(*ws, "reset")) {
+		m->oldpc = 0;
 		for (int i = 0; i < 17; i++) {
 			m->registers[i] = 0;
 		}
@@ -1456,6 +1459,7 @@ step(struct machine *m, struct dynarr *breaks)
 	unsigned int regs = 0;
 	int caught = -1;
 	_Bool carry = 0;
+	m->oldpc = m->registers[15];
 	switch (instr>>12) {
 	case 0:
 		regd = (instr>>4)&0xF;
@@ -1508,7 +1512,7 @@ step(struct machine *m, struct dynarr *breaks)
 		regd = (instr>>4)&0xF;
 		source = (instr>>8UL)&0x7UL;
 		source = (instr&0xFUL)<<(source<<2UL);
-		if ((instr>>12)&1) source = ~source;
+		if ((instr>>12)&1) source = (~source) & 0xFFFFFFFFUL;
 		origreg = m->registers[regd];
 		result = (unsigned long long)origreg + source;
 		if ((instr>>12) == 5) {
@@ -1543,7 +1547,7 @@ step(struct machine *m, struct dynarr *breaks)
 		case 8:
 			result = origreg & source;
 			m->registers[regd] = result&0xFFFFFFFFUL;
-			if (!(instr&0x8000UL)) break;
+			if (!(instr&0x0800UL)) break;
 			m->registers[16] &= ~0xF;
 			m->registers[16] |= (result&0x80000000UL)? 2 : 0;
 			m->registers[16] |= result? 0 : 1;
@@ -1552,7 +1556,7 @@ step(struct machine *m, struct dynarr *breaks)
 		case 9:
 			result = origreg & ~source;
 			m->registers[regd] = result&0xFFFFFFFFUL;
-			if (!(instr&0x8000UL)) break;
+			if (!(instr&0x0800UL)) break;
 			m->registers[16] &= ~0xF;
 			m->registers[16] |= (result&0x80000000UL)? 2 : 0;
 			m->registers[16] |= result? 0 : 1;
@@ -1561,7 +1565,7 @@ step(struct machine *m, struct dynarr *breaks)
 		case 10:
 			result = origreg | source;
 			m->registers[regd] = result&0xFFFFFFFFUL;
-			if (!(instr&0x8000UL)) break;
+			if (!(instr&0x0800UL)) break;
 			m->registers[16] &= ~0xF;
 			m->registers[16] |= (result&0x80000000UL)? 2 : 0;
 			m->registers[16] |= result? 0 : 1;
@@ -1570,7 +1574,7 @@ step(struct machine *m, struct dynarr *breaks)
 		case 11:
 			result = origreg ^ source;
 			m->registers[regd] = result&0xFFFFFFFFUL;
-			if (!(instr&0x8000UL)) break;
+			if (!(instr&0x0800UL)) break;
 			m->registers[16] &= ~0xF;
 			m->registers[16] |= (result&0x80000000UL)? 2 : 0;
 			m->registers[16] |= result? 0 : 1;
@@ -1583,7 +1587,7 @@ step(struct machine *m, struct dynarr *breaks)
 		case 14:
 		case 7:
 		case 15:
-			if ((instr>>8)&1) source = ~source;
+			if ((instr>>8)&1) source = (~source) & 0xFFFFFFFFUL;
 			result = (unsigned long long)origreg + source;
 			if (((instr>>8)&0x7) == 5) {
 				result++;
@@ -1853,6 +1857,7 @@ static _Bool
 athalt(struct machine *m)
 {
 	if (!m) return 1;
+	if (m->oldpc == m->registers[15]) return 1;
 	switch (instruction(m, m->registers[15]) & 0xF0FFU) {
 	case 0xb000U: /* b . */
 	case 0xc0ffU: /* mov pc, pc */

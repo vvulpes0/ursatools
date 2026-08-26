@@ -266,7 +266,7 @@ main(int argc, char *argv[])
 		memories, memories + textsize,
 		textsize, datasize,
 		{0},
-		0,
+		0xFFFFFFFFUL,
 		0,
 	};
 	if (argc) {
@@ -429,7 +429,7 @@ repl(struct machine *m, struct dynarr *breaks, int flags, char **oldws)
 			        error());
 		}
 	} else if (!strcmp(*ws, "reset")) {
-		m->oldpc = 0;
+		m->oldpc = 0xFFFFFFFFUL;
 		for (int i = 0; i < 17; i++) {
 			m->registers[i] = 0;
 		}

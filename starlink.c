@@ -198,7 +198,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	retval = emitlogisim(outprefix, text, data, flags);
+	retval = !emitlogisim(outprefix, text, data, flags);
 	if (flags & SL_EMITMAP) emitmap(outprefix, argv, objs);
 
 	da_free(text);

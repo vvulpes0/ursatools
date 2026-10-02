@@ -1535,7 +1535,7 @@ step(struct machine *m, struct dynarr *breaks)
 		     && (origreg&0x80000000UL) != (source&0x80000000)
 		    )? 4 : 0;
 		m->registers[16] |= (result&0x80000000UL)? 2 : 0;
-		m->registers[16] |= result? 0 : 1;
+		m->registers[16] |= (result&0xFFFFFFFFUL)? 0 : 1;
 		break;
 	case 8:
 		regd = (instr>>4)&0xF;
@@ -1609,7 +1609,7 @@ step(struct machine *m, struct dynarr *breaks)
 			     && (origreg&0x80000000UL) != (source&0x80000000)
 			    )? 4 : 0;
 			m->registers[16] |= (result&0x80000000UL)? 2 : 0;
-			m->registers[16] |= result? 0 : 1;
+			m->registers[16] |= (result&0xFFFFFFFFUL)? 0 : 1;
 			break;
 		default:
 			fprintf(stderr, "%sinternal error\n", error());

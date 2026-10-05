@@ -1283,7 +1283,7 @@ load(struct machine *m, char const *prefix)
 	FILE *f = fopen(buf, "r");
 	if (f) {
 		_Bool status = logiread(f, m->text, m->textsize);
-		fclose(f);
+		fclose(f); f = NULL;
 		if (!status) {
 			free(buf);
 			return 0;
@@ -1293,7 +1293,6 @@ load(struct machine *m, char const *prefix)
 		fprintf(stderr, "%sfailed to load text segment\n", warn());
 		perror(NULL);
 	}
-	if (f) { fclose(f); f = NULL; }
 
 	/* load data */
 	strncpy(buf, prefix, n + 1);
@@ -1302,7 +1301,7 @@ load(struct machine *m, char const *prefix)
 	if (f) {
 		m->isloaded = 0;
 		_Bool status = logiread(f, m->data, m->datasize);
-		fclose(f);
+		fclose(f); f = NULL;
 		if (!status) {
 			free(buf);
 			return 0;
@@ -1322,7 +1321,7 @@ load(struct machine *m, char const *prefix)
 	f = fopen(buf, "r");
 	if (f) {
 		mapread(f, &m->map);
-		fclose(f);
+		fclose(f); f = NULL;
 	}
 	free(buf);
 	return m->isloaded;

@@ -380,6 +380,9 @@ read_symbol(void)
 			if (c1 == 'p') {
 				out.type = ALX_REG;
 				out.u.num = 13;
+			} else if (c1 == 'r') {
+				out.type = ALX_REG;
+				out.u.num = 16;
 			}
 			break;
 		default:

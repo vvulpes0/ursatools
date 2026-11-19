@@ -1684,7 +1684,7 @@ step(struct machine *m, struct dynarr *breaks)
 		case 3:
 			break;
 		case 7:
-			if (instr&0x08000000UL) {
+			if (instr&0x0800UL) {
 				result  = (!!m->registers[16])<<31;
 				result |= origreg>>1;
 				result &= 0xFFFFFFFFUL;

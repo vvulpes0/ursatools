@@ -1459,15 +1459,19 @@ collectsyms(Elf32_Word *nlocals)
 
 	/* EXTERNALS */
 
-	/* prepend UNK */
-	for (int i = state.fixups.length - 1; i >= 0; i--) {
+	/* prepend UNK in occurrence order */
+	for (int i = 0; i < state.fixups.length; i++) {
 		struct fixup *f = (struct fixup *)da_get(state.fixups, i);
 		if (!f || f->handled) continue;
 		struct value v = evalexpr(f->expr, f->section, f->offset);
 		if (v.sec == PS_UNK && v.fromsym) {
-			names = ntsladd(names, v.symbol.content);
+			if (ntslfind(names, v.symbol.content) == -1) {
+				ntslappend(&names, v.symbol.content);
+			}
 		}
 	}
+
+	/* items below happen at most once */
 
 	/* GLOBALS */
 
@@ -1603,7 +1607,7 @@ installsyms(struct section *symtab, struct section *strtab,
 	/* EXTERNALS */
 
 	/* append UNK */
-	for (int i = state.fixups.length - 1; i >= 0; i--) {
+	for (int i = 0 ; i < state.fixups.length; i++) {
 		struct fixup *f = (struct fixup *)da_get(state.fixups, i);
 		if (!f || f->handled) continue;
 		struct value v = evalexpr(f->expr, f->section, f->offset);

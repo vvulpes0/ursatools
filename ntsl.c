@@ -48,6 +48,9 @@ ntslfree(struct ntsl *p)
 char *
 ntslget(struct ntsl const *p, int i)
 {
-	for (; p && i >= 0; i--) if (i == 0) return p->content;
+	for (; p && i >= 0; i--) {
+		if (i == 0) return p->content;
+		p = p->next;
+	}
 	return NULL;
 }

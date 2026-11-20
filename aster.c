@@ -273,6 +273,8 @@ main(int argc, char **argv) {
 			} else {
 				obj_emit(elf, outfile);
 			}
+		} else {
+			retval = 1;
 		}
 		obj_free(elf);
 	} else {
@@ -1394,6 +1396,12 @@ makeelf(struct objfile *out)
 		buf += f->offset;
 		struct section *relsec = (f->section == PS_TEXT)?
 			reltextsec : reldatasec;
+		if (f->type == R_URSA_PC8 && v.sec != PS_UNK) {
+			evalerr("internal relative branch out of range",
+			        f->expr);
+			good = 0;
+			break;
+		}
 		int xadd = 0;
 		if (f->type == R_URSA_PC8 && v.sec == PS_UNK) {
 			xadd = f->offset;

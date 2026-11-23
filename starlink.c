@@ -484,7 +484,7 @@ applyrels1(struct dynarr objs, struct objfile obj, struct section *sec,
 {
 	struct section *target = obj_sec(obj, sec->h.sh_info);
 	struct section *ts = obj_secn(obj, ".text");
-	/* struct section *ds = obj_secn(obj, ".data"); */
+	struct section *ds = obj_secn(obj, ".data");
 	struct section *symtab = obj_sec(obj, sec->h.sh_link);
 	struct section *strtab
 		= obj_sec(obj, symtab->h.sh_link);
@@ -497,15 +497,21 @@ applyrels1(struct dynarr objs, struct objfile obj, struct section *sec,
 		Elf32_Sym sym = evaluate(objs, obj, symtab, strtab, symi);
 		int targi = (target == ts)? 1 : 2;
 		unsigned char *buf = (target == ts)? t->content : d->content;
+		Elf32_Addr base = 0;
+		if (target == ts) base = ts->h.sh_addr;
+		if (target == ds) base = ds->h.sh_addr;
 		if (rt == R_URSA_PC8 && targi != sym.st_shndx) {
 			fprintf(stderr, "error: bad pcrel section\n");
 			return 0;
 		}
-		if (!rel_apply(rt, buf + rel.r_offset, rel.r_offset,
+		long long place = rel.r_offset + base;
+		if (!rel_apply(rt, buf + place /* rel.r_offset */,
+		               place /* rel.r_offset */,
 		               sym.st_value, rel.r_addend)) {
 			fprintf(stderr, "error: relocation failed\n");
 			fprintf(stderr, "\t    rt:%d\n", rt);
-			fprintf(stderr, "\toffset:%d\n", rel.r_offset);
+			fprintf(stderr, "\toffset:%lld (%d)\n",
+			        place, rel.r_offset);
 			fprintf(stderr, "\t value:%d\n", sym.st_value);
 			fprintf(stderr, "\taddend:%d\n", rel.r_addend);
 			return 0;
